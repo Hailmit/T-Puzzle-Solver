@@ -34,6 +34,8 @@
       color: var(--text);
       font-family: "Space Grotesk", "Segoe UI", sans-serif;
       overflow: hidden;
+      overscroll-behavior: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     body::before,
@@ -68,7 +70,7 @@
       grid-template-columns: 380px minmax(0, 1fr);
       height: 100%;
       gap: 18px;
-      padding: 18px;
+      padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
     }
 
     .sidebar,
@@ -93,6 +95,7 @@
       display: flex;
       flex-direction: column;
       gap: 18px;
+      overscroll-behavior: contain;
     }
 
     .hero {
@@ -181,6 +184,7 @@
       padding: 12px 14px;
       color: var(--text);
       outline: none;
+      font-size: 16px;
     }
 
     input[type="range"] {
@@ -370,6 +374,7 @@
       min-height: 0;
       height: 100%;
       position: relative;
+      touch-action: none;
     }
 
     #viewport canvas {
@@ -580,7 +585,7 @@
     @media (max-width: 1120px) {
       .app-shell {
         grid-template-columns: 1fr;
-        grid-template-rows: minmax(0, auto) minmax(360px, 1fr);
+        grid-template-rows: minmax(0, auto) minmax(62vh, 1fr);
         overflow: auto;
         height: auto;
         min-height: 100%;
@@ -605,12 +610,12 @@
 
     @media (max-width: 720px) {
       .app-shell {
-        padding: 10px;
+        padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(calc(16px + env(safe-area-inset-bottom)), 16px) max(10px, env(safe-area-inset-left));
         gap: 10px;
       }
 
       .sidebar-scroll {
-        padding: 16px;
+        padding: 16px 16px calc(20px + env(safe-area-inset-bottom));
       }
 
       .grid-2,
@@ -632,9 +637,12 @@
       .slice-scrubber {
         left: 18px;
         right: 18px;
-        bottom: 18px;
+        bottom: calc(12px + env(safe-area-inset-bottom));
         transform: none;
         width: auto;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 18px;
       }
 
       .vertical-range-wrap {
@@ -643,6 +651,20 @@
 
       .vertical-range {
         width: 100%;
+        height: 28px;
+      }
+
+      .slice-scrubber button {
+        width: 52px;
+        min-height: 42px;
+      }
+
+      .slice-value {
+        min-width: 68px;
+      }
+
+      .overlay-value {
+        font-size: 14px;
       }
     }
   </style>
@@ -1178,12 +1200,19 @@
         this.state = "idle";
         this.pointer = { x: 0, y: 0 };
         this.panOffset = new THREE.Vector3();
+        this.touchMode = "idle";
+        this.touchDistance = 0;
+        this.touchMidpoint = { x: 0, y: 0 };
 
         this.domElement.addEventListener("contextmenu", (event) => event.preventDefault());
         this.domElement.addEventListener("mousedown", (event) => this.onPointerDown(event));
         window.addEventListener("mousemove", (event) => this.onPointerMove(event));
         window.addEventListener("mouseup", () => this.onPointerUp());
         this.domElement.addEventListener("wheel", (event) => this.onWheel(event), { passive: false });
+        this.domElement.addEventListener("touchstart", (event) => this.onTouchStart(event), { passive: false });
+        this.domElement.addEventListener("touchmove", (event) => this.onTouchMove(event), { passive: false });
+        this.domElement.addEventListener("touchend", (event) => this.onTouchEnd(event));
+        this.domElement.addEventListener("touchcancel", (event) => this.onTouchEnd(event));
 
         this.syncFromCamera();
       }
@@ -1237,6 +1266,88 @@
         const factor = 1 + Math.sign(event.deltaY) * this.zoomSpeed;
         this.spherical.radius *= factor;
         this.spherical.radius = Math.max(3, Math.min(80, this.spherical.radius));
+      }
+
+      getTouchDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.hypot(dx, dy);
+      }
+
+      getTouchMidpoint(touches) {
+        return {
+          x: (touches[0].clientX + touches[1].clientX) / 2,
+          y: (touches[0].clientY + touches[1].clientY) / 2
+        };
+      }
+
+      onTouchStart(event) {
+        if (event.touches.length === 1) {
+          event.preventDefault();
+          this.touchMode = "rotate";
+          this.pointer.x = event.touches[0].clientX;
+          this.pointer.y = event.touches[0].clientY;
+        } else if (event.touches.length >= 2) {
+          event.preventDefault();
+          this.touchMode = "pinch-pan";
+          this.touchDistance = this.getTouchDistance(event.touches);
+          this.touchMidpoint = this.getTouchMidpoint(event.touches);
+        }
+      }
+
+      onTouchMove(event) {
+        if (event.touches.length === 1 && this.touchMode === "rotate") {
+          event.preventDefault();
+          const touch = event.touches[0];
+          const dx = touch.clientX - this.pointer.x;
+          const dy = touch.clientY - this.pointer.y;
+          this.pointer.x = touch.clientX;
+          this.pointer.y = touch.clientY;
+          this.spherical.theta -= dx * this.rotateSpeed;
+          this.spherical.phi -= dy * this.rotateSpeed;
+          const epsilon = 0.001;
+          this.spherical.phi = Math.max(epsilon, Math.min(Math.PI - epsilon, this.spherical.phi));
+        } else if (event.touches.length >= 2) {
+          event.preventDefault();
+          const newDistance = this.getTouchDistance(event.touches);
+          const midpoint = this.getTouchMidpoint(event.touches);
+          const distanceDelta = newDistance - this.touchDistance;
+          const midpointDx = midpoint.x - this.touchMidpoint.x;
+          const midpointDy = midpoint.y - this.touchMidpoint.y;
+
+          this.spherical.radius *= 1 - distanceDelta * 0.0035;
+          this.spherical.radius = Math.max(3, Math.min(80, this.spherical.radius));
+
+          const distance = this.camera.position.distanceTo(this.target);
+          const panX = -midpointDx * this.panSpeed * distance * 0.5;
+          const panY = midpointDy * this.panSpeed * distance * 0.5;
+          const forward = this.target.clone().sub(this.camera.position).normalize();
+          const right = new THREE.Vector3().crossVectors(forward, this.camera.up).normalize();
+          const up = new THREE.Vector3().copy(this.camera.up).normalize();
+          this.panOffset.copy(right.multiplyScalar(panX)).add(up.multiplyScalar(panY));
+          this.camera.position.add(this.panOffset);
+          this.target.add(this.panOffset);
+          this.syncFromCamera();
+
+          this.touchDistance = newDistance;
+          this.touchMidpoint = midpoint;
+        }
+      }
+
+      onTouchEnd(event) {
+        if (event.touches.length === 0) {
+          this.touchMode = "idle";
+          return;
+        }
+        if (event.touches.length === 1) {
+          this.touchMode = "rotate";
+          this.pointer.x = event.touches[0].clientX;
+          this.pointer.y = event.touches[0].clientY;
+          return;
+        }
+        this.touchMode = "pinch-pan";
+        this.touchDistance = this.getTouchDistance(event.touches);
+        this.touchMidpoint = this.getTouchMidpoint(event.touches);
       }
 
       update() {
