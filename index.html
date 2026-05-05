@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -654,14 +654,14 @@
         <section class="hero">
           <span class="eyebrow">3D Packing Lab</span>
           <h1>T-Tetromino Cube Solver</h1>
-          <p class="subtitle">Giải và xem trực tiếp từng bước backtracking khi ghép các mảnh chữ T 4 voxel thành khối lập phương đặc hoặc vỏ khối lập phương.</p>
+          <p class="subtitle">Solve and visualize a 3D packing puzzle made from identical 4-voxel T pieces, either as a solid cube or a hollow cube shell.</p>
         </section>
 
         <section class="panel">
-          <h2>Cấu hình puzzle</h2>
+          <h2>Puzzle Setup</h2>
           <div class="grid-2">
             <label>
-              Kích thước N
+              Size N
               <select id="sizeInput">
                 <option value="4">4</option>
                 <option value="6" selected>6</option>
@@ -675,7 +675,7 @@
               </select>
             </label>
           </div>
-          <p class="helper-text">Layer được điều khiển bằng scrubber ở cạnh phải viewport.</p>
+          <p class="helper-text">Use the layer scrubber in the viewport to inspect Z slices.</p>
           <div class="button-grid">
             <button id="solveBtn" class="secondary">Solve Fast</button>
             <button id="resetBtn" class="danger">Reset</button>
@@ -683,7 +683,7 @@
         </section>
 
         <section class="panel">
-          <h2>Tiến trình</h2>
+          <h2>Progress</h2>
           <div class="stats">
             <div class="stat">
               <span class="stat-label">Placed pieces</span>
@@ -702,7 +702,7 @@
             <span class="status-dot"></span>
             <span id="statusText">ready</span>
           </div>
-          <p id="summaryText" class="subtitle status-summary">Đổi `N` hoặc `Mode` để app tự sinh lại target và placement.</p>
+          <p id="summaryText" class="subtitle status-summary">Changing `N` or `Mode` automatically rebuilds the target and placements.</p>
         </section>
 
         <section class="panel hidden">
@@ -749,11 +749,7 @@
       <div class="viewport-overlay">
         <div class="overlay-card">
           <p class="overlay-title">Last action</p>
-          <p id="lastAction" class="overlay-value">Chưa có bước nào.</p>
-        </div>
-        <div class="overlay-card">
-          <p class="overlay-title">Hint</p>
-          <p class="overlay-value">Chuột trái để xoay camera, cuộn để zoom, chuột phải để pan. `Solve` chạy nhanh đến khi có kết quả, `Play` chạy từng bước theo tốc độ slider.</p>
+          <p id="lastAction" class="overlay-value">No steps yet.</p>
         </div>
       </div>
     </main>
@@ -949,7 +945,7 @@
 
         if (this.targetCount % 4 !== 0) {
           this.status = "no-solution";
-          this.reason = `Target có ${this.targetCount} voxel, không chia hết cho 4 nên không thể lát kín bằng T-tetromino.`;
+          this.reason = `The target has ${this.targetCount} voxels, which is not divisible by 4, so it cannot be tiled with T-tetrominoes.`;
         }
       }
 
@@ -1078,7 +1074,7 @@
             if (choice.options.length === 0) {
               if (this.placedStack.length === 0) {
                 this.status = "no-solution";
-                this.reason = "Không còn placement hợp lệ cho ô khó nhất ở root.";
+                this.reason = "No valid placement remains for the most constrained root cell.";
                 const failedEvent = {
                   type: "no-solution",
                   step: this.stepCount,
@@ -1094,7 +1090,7 @@
                 type: "backtrack",
                 placement,
                 step: this.stepCount,
-                reason: `Dead-end tại ô ${choice.cellKey}`
+                reason: `Dead end at cell ${choice.cellKey}`
               };
               this.history.push(backtrackEvent);
               return backtrackEvent;
@@ -1132,7 +1128,7 @@
           this.frames.pop();
           if (this.placedStack.length === 0) {
             this.status = "no-solution";
-            this.reason = "Đã thử hết mọi placement hợp lệ.";
+            this.reason = "All valid placements have been exhausted.";
             const exhaustedEvent = {
               type: "no-solution",
               step: this.stepCount,
@@ -1148,7 +1144,7 @@
             type: "backtrack",
             placement: removed,
             step: this.stepCount,
-            reason: `Hết lựa chọn cho ô ${frame.cellKey}`
+            reason: `No options left for cell ${frame.cellKey}`
           };
           this.history.push(backtrackEvent);
           return backtrackEvent;
@@ -1632,6 +1628,7 @@
       autoPlay: false,
       solveFast: false,
       fastRafId: 0,
+      fastLastUiSyncMs: 0,
       playInterval: 0,
       configKey: null,
       layerMode: "all"
@@ -1850,11 +1847,11 @@
         ui.lastAction.textContent = `Place depth ${event.depth}: ${formatPlacement(event.placement)}`;
       } else if (event.type === "backtrack") {
         state.visualizer.removePlacement(event.placement);
-        ui.lastAction.textContent = `Backtrack: gỡ mảnh ${formatPlacement(event.placement)}. ${event.reason}`;
+        ui.lastAction.textContent = `Backtrack: remove piece ${formatPlacement(event.placement)}. ${event.reason}`;
       } else if (event.type === "solved") {
-        ui.lastAction.textContent = `Solved với ${event.pieces} mảnh sau ${event.step} bước.`;
+        ui.lastAction.textContent = `Solved with ${event.pieces} pieces after ${event.step} steps.`;
       } else if (event.type === "no-solution") {
-        ui.lastAction.textContent = event.reason || "Không tìm thấy lời giải.";
+        ui.lastAction.textContent = event.reason || "No solution found.";
       }
 
       refreshStats();
@@ -1883,9 +1880,9 @@
       const placementCount = state.solver.placements.length;
       const orientationCount = state.solver.orientations.length;
       const pieceInfo = Number.isInteger(state.solver.expectedPieceCount)
-        ? `${state.solver.expectedPieceCount} mảnh`
-        : `${state.solver.targetCount}/4 mảnh`;
-      ui.summaryText.textContent = `${orientationCount} orientation, ${placementCount} placement hợp lệ, target ${pieceInfo}. ${state.solver.reason || ""}`.trim();
+        ? `${state.solver.expectedPieceCount} pieces`
+        : `${state.solver.targetCount}/4 pieces`;
+      ui.summaryText.textContent = `${orientationCount} orientations, ${placementCount} valid placements, target ${pieceInfo}. ${state.solver.reason || ""}`.trim();
       ui.solveBtn.disabled = false;
       ui.resetBtn.disabled = false;
     }
@@ -1893,6 +1890,7 @@
     function stopAllPlayback() {
       state.autoPlay = false;
       state.solveFast = false;
+      state.fastLastUiSyncMs = 0;
       if (state.playInterval) {
         clearInterval(state.playInterval);
         state.playInterval = 0;
@@ -1918,7 +1916,7 @@
       state.solver = new TPuzzleSolver3D(size, mode);
       state.configKey = nextConfigKey;
       if (!state.visualizer) {
-        ui.lastAction.textContent = "Three.js viewer chưa khởi tạo được. Mở F12 để xem lỗi CDN.";
+        ui.lastAction.textContent = "The Three.js viewer failed to initialize. Open DevTools to inspect the CDN error.";
         refreshLayerOptions(size);
         renderOrientations(state.solver.orientations);
         refreshStats();
@@ -1927,28 +1925,28 @@
       refreshLayerOptions(size);
       renderStateToScene(false);
       renderOrientations(state.solver.orientations);
-      ui.lastAction.textContent = "Target và placement đã được sinh xong.";
+      ui.lastAction.textContent = "Target cells and placements have been generated.";
       refreshStats();
     }
 
-    function solveFastLoop() {
+    function solveFastLoop(timestamp = 0) {
       if (!state.solveFast || !state.solver) {
         return;
       }
-      const batchSize = 320;
-      let lastEvent = null;
-      for (let i = 0; i < batchSize; i += 1) {
-        lastEvent = state.solver.stepSolve();
-        if (lastEvent && (lastEvent.type === "place" || lastEvent.type === "backtrack")) {
-          applyEvent(lastEvent);
-        }
-        if (state.solver.status === "solved" || state.solver.status === "no-solution") {
-          applyEvent(lastEvent);
-          stopAllPlayback();
-          return;
-        }
+      const batchSize = 2400;
+      const lastEvent = state.solver.solve(batchSize);
+
+      if (state.solver.status === "solved" || state.solver.status === "no-solution") {
+        renderStateToScene(false);
+        applyEvent(lastEvent);
+        stopAllPlayback();
+        return;
       }
-      if (lastEvent) {
+
+      if (timestamp - state.fastLastUiSyncMs >= 120) {
+        state.fastLastUiSyncMs = timestamp;
+        renderStateToScene(false);
+        ui.lastAction.textContent = `Searching... ${state.solver.stepCount} steps, ${state.solver.placedStack.length} pieces currently placed.`;
         refreshStats();
       }
       state.fastRafId = requestAnimationFrame(solveFastLoop);
@@ -1966,6 +1964,8 @@
       }
       stopAllPlayback();
       state.solveFast = true;
+      state.fastLastUiSyncMs = 0;
+      ui.lastAction.textContent = "Searching for a solution...";
       state.fastRafId = requestAnimationFrame(solveFastLoop);
     }
 
@@ -1979,7 +1979,7 @@
       if (state.visualizer) {
         renderStateToScene(false);
       }
-      ui.lastAction.textContent = "Solver và scene đã reset.";
+      ui.lastAction.textContent = "Solver state and scene have been reset.";
       refreshStats();
     }
 
@@ -2007,7 +2007,7 @@
       console.error(error);
       state.visualizer = null;
       updateStatus("no-solution", "viewer error");
-      ui.lastAction.textContent = `Không khởi tạo được viewer 3D: ${error.message}`;
+      ui.lastAction.textContent = `Failed to initialize the 3D viewer: ${error.message}`;
     }
     refreshLayerLabel();
     generatePuzzle();
