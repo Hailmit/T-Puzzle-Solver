@@ -1,0 +1,2016 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D T-Tetromino Puzzle Solver</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap");
+
+    :root {
+      --bg: #f3efe6;
+      --panel: rgba(255, 251, 242, 0.84);
+      --panel-strong: rgba(255, 248, 234, 0.95);
+      --line: rgba(65, 51, 34, 0.16);
+      --text: #221c15;
+      --muted: #6f6255;
+      --accent: #b64d1a;
+      --accent-2: #0b6e4f;
+      --danger: #9d2f3f;
+      --shadow: 0 24px 60px rgba(38, 24, 14, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(231, 187, 137, 0.4), transparent 26%),
+        radial-gradient(circle at bottom right, rgba(136, 197, 181, 0.38), transparent 30%),
+        linear-gradient(135deg, #f7f0e5 0%, #efe7d8 55%, #e5dccb 100%);
+      color: var(--text);
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto;
+      pointer-events: none;
+      border-radius: 999px;
+      filter: blur(12px);
+      opacity: 0.28;
+    }
+
+    body::before {
+      width: 280px;
+      height: 280px;
+      left: -90px;
+      top: 10%;
+      background: #ffd294;
+    }
+
+    body::after {
+      width: 320px;
+      height: 320px;
+      right: -120px;
+      bottom: 8%;
+      background: #b8e7db;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr);
+      height: 100%;
+      gap: 18px;
+      padding: 18px;
+    }
+
+    .sidebar,
+    .viewport-card {
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      box-shadow: var(--shadow);
+      border-radius: 28px;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .sidebar-scroll {
+      overflow: auto;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .hero {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(182, 77, 26, 0.12);
+      color: var(--accent);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(28px, 3.4vw, 40px);
+      line-height: 0.95;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle,
+    .explain-text {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .panel {
+      background: var(--panel-strong);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .stack-1 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    input[type="number"],
+    select,
+    button {
+      font: inherit;
+    }
+
+    input[type="number"],
+    select {
+      width: 100%;
+      border: 1px solid rgba(64, 47, 24, 0.14);
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 14px;
+      padding: 12px 14px;
+      color: var(--text);
+      outline: none;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .range-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .range-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .range-value {
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .range-checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 15px;
+      padding: 12px 14px;
+      min-height: 54px;
+      cursor: pointer;
+      background: rgba(34, 28, 21, 0.08);
+      color: var(--text);
+      transition: transform 140ms ease, background 140ms ease, opacity 140ms ease;
+      font-weight: 700;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+      background: rgba(34, 28, 21, 0.13);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+
+    .primary {
+      background: linear-gradient(135deg, #d86b2f 0%, #b64d1a 100%);
+      color: white;
+    }
+
+    .secondary {
+      background: linear-gradient(135deg, #12785a 0%, #0b6e4f 100%);
+      color: white;
+    }
+
+    .danger {
+      background: linear-gradient(135deg, #b4495b 0%, #95273c 100%);
+      color: white;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .stat {
+      padding: 12px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 84px;
+    }
+
+    .stat-label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      min-height: 32px;
+      line-height: 1.25;
+    }
+
+    .stat-value {
+      display: block;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .status-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--muted);
+      margin-top: 2px;
+      padding: 0 4px;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: #d8b45f;
+      box-shadow: 0 0 0 4px rgba(216, 180, 95, 0.18);
+    }
+
+    .status-solving .status-dot {
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(182, 77, 26, 0.18);
+    }
+
+    .status-solved .status-dot {
+      background: var(--accent-2);
+      box-shadow: 0 0 0 4px rgba(11, 110, 79, 0.18);
+    }
+
+    .status-no-solution .status-dot {
+      background: var(--danger);
+      box-shadow: 0 0 0 4px rgba(157, 47, 63, 0.18);
+    }
+
+    .inline-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .status-summary {
+      margin: 0;
+      padding: 0 4px;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .helper-text {
+      margin: -4px 0 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .viewport-card {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      overflow: hidden;
+    }
+
+    #viewport {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      height: 100%;
+      position: relative;
+    }
+
+    #viewport canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .viewport-overlay {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      top: 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      pointer-events: none;
+    }
+
+    .overlay-card {
+      pointer-events: auto;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(255, 250, 241, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(16px);
+      max-width: min(360px, 42vw);
+    }
+
+    .overlay-title {
+      margin: 0 0 6px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .overlay-value {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+
+    .hover-badge {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(34, 24, 15, 0.86);
+      color: #fff6e8;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(14px);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+
+    .hover-badge.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .slice-scrubber {
+      position: absolute;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: min(560px, calc(100% - 160px));
+      padding: 10px 14px;
+      border-radius: 22px;
+      background: rgba(255, 250, 241, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 18px 34px rgba(52, 34, 21, 0.12);
+    }
+
+    .slice-scrubber button {
+      width: 52px;
+      min-height: 42px;
+      padding: 8px 0;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .slice-scrubber button.active {
+      background: linear-gradient(135deg, #d86b2f 0%, #b64d1a 100%);
+      color: white;
+    }
+
+    .slice-axis {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      text-transform: uppercase;
+      white-space: nowrap;
+      min-width: 52px;
+    }
+
+    .slice-value {
+      min-width: 72px;
+      text-align: center;
+      padding: 6px 8px;
+      border-radius: 999px;
+      background: rgba(34, 28, 21, 0.08);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .vertical-range-wrap {
+      flex: 1;
+      min-width: 160px;
+      height: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .vertical-range {
+      width: 100%;
+      height: 22px;
+      margin: 0;
+      writing-mode: horizontal-tb;
+      -webkit-appearance: auto;
+      appearance: auto;
+    }
+
+    .slice-mark {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .slice-mark.top {
+      left: 0;
+      top: auto;
+      bottom: -18px;
+      transform: translateX(0);
+    }
+
+    .slice-mark.bottom {
+      right: 0;
+      bottom: -18px;
+      left: auto;
+      top: auto;
+      transform: translateX(0);
+    }
+
+    .orientation-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .orientation-card {
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .orientation-card strong {
+      font-size: 13px;
+    }
+
+    .orientation-card small {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .orientation-canvas {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(182, 77, 26, 0.08), rgba(11, 110, 79, 0.12)),
+        rgba(255, 255, 255, 0.8);
+    }
+
+    .tips {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 1120px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, auto) minmax(360px, 1fr);
+        overflow: auto;
+        height: auto;
+        min-height: 100%;
+      }
+
+      body {
+        overflow: auto;
+      }
+
+      .viewport-card {
+        min-height: 72vh;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .overlay-card {
+        max-width: 46vw;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .app-shell {
+        padding: 10px;
+        gap: 10px;
+      }
+
+      .sidebar-scroll {
+        padding: 16px;
+      }
+
+      .grid-2,
+      .button-grid,
+      .orientation-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .viewport-overlay {
+        flex-direction: column;
+        right: auto;
+        max-width: calc(100% - 36px);
+      }
+
+      .overlay-card {
+        max-width: none;
+      }
+
+      .slice-scrubber {
+        left: 18px;
+        right: 18px;
+        bottom: 18px;
+        transform: none;
+        width: auto;
+      }
+
+      .vertical-range-wrap {
+        min-width: 120px;
+      }
+
+      .vertical-range {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-scroll">
+        <section class="hero">
+          <span class="eyebrow">3D Packing Lab</span>
+          <h1>T-Tetromino Cube Solver</h1>
+          <p class="subtitle">Giải và xem trực tiếp từng bước backtracking khi ghép các mảnh chữ T 4 voxel thành khối lập phương đặc hoặc vỏ khối lập phương.</p>
+        </section>
+
+        <section class="panel">
+          <h2>Cấu hình puzzle</h2>
+          <div class="grid-2">
+            <label>
+              Kích thước N
+              <select id="sizeInput">
+                <option value="4">4</option>
+                <option value="6" selected>6</option>
+              </select>
+            </label>
+            <label>
+              Mode
+              <select id="modeSelect">
+                <option value="SOLID_CUBE">SOLID_CUBE</option>
+                <option value="SURFACE_CUBE">SURFACE_CUBE</option>
+              </select>
+            </label>
+          </div>
+          <p class="helper-text">Layer được điều khiển bằng scrubber ở cạnh phải viewport.</p>
+          <div class="button-grid">
+            <button id="solveBtn" class="secondary">Solve Fast</button>
+            <button id="resetBtn" class="danger">Reset</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Tiến trình</h2>
+          <div class="stats">
+            <div class="stat">
+              <span class="stat-label">Placed pieces</span>
+              <span id="placedCount" class="stat-value">0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Steps</span>
+              <span id="stepCount" class="stat-value">0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Target voxels</span>
+              <span id="targetCount" class="stat-value">0</span>
+            </div>
+          </div>
+          <div id="statusLine" class="status-line">
+            <span class="status-dot"></span>
+            <span id="statusText">ready</span>
+          </div>
+          <p id="summaryText" class="subtitle status-summary">Đổi `N` hoặc `Mode` để app tự sinh lại target và placement.</p>
+        </section>
+
+        <section class="panel hidden">
+          <h2>Trace / Solution</h2>
+          <p class="subtitle">Hiển thị stack hiện tại của backtracking. Khi solved, đây là nghiệm cuối cùng để export.</p>
+          <pre id="solutionPreview" style="margin:0; padding:14px; border-radius:16px; background:rgba(32,24,16,0.92); color:#f5eee3; min-height:160px; max-height:260px; overflow:auto; font:12px/1.5 Consolas, monospace;">Chưa có placement nào.</pre>
+        </section>
+
+        <section class="panel hidden">
+          <div class="inline-row">
+            <h2>Debug</h2>
+            <label class="toggle">
+              <input id="orientationToggle" type="checkbox" />
+              Show orientations
+            </label>
+          </div>
+          <div id="orientationPanel" class="orientation-grid hidden"></div>
+          <p class="tips">Layer filter chỉ hiển thị các mảnh có voxel nằm ở layer z tương ứng. Với puzzle lớn, bật orientation debug không ảnh hưởng solver vì mọi orientation đã được cache.</p>
+        </section>
+
+        <section class="panel hidden">
+          <h2>Giải thích ngắn</h2>
+          <p class="explain-text">Orientation được sinh từ hình T 2D, xoay 4 góc rồi gắn lên ba mặt phẳng XY, XZ, YZ và chuẩn hóa về gốc để loại bản sao trùng nhau.</p>
+          <p class="explain-text">Placement được tạo bằng cách trượt từng orientation trong bounding box N x N x N, chỉ giữ các vị trí mà cả 4 voxel vẫn nằm trong target shape.</p>
+          <p class="explain-text">Backtracking luôn chọn ô trống khó nhất trước, tức ô có ít placement hợp lệ nhất ở trạng thái hiện tại. Heuristic này giảm mạnh nhánh thử vô ích nên solver nhanh hơn đáng kể.</p>
+          <p class="explain-text">Giới hạn thực tế: với N lớn hơn 5, số placement tăng rất nhanh nên realtime browser solver sẽ chậm rõ rệt, đặc biệt ở mode SOLID_CUBE.</p>
+        </section>
+      </div>
+    </aside>
+
+    <main class="viewport-card">
+      <div id="viewport"></div>
+      <div id="hoverBadge" class="hover-badge">Piece #0</div>
+      <div class="slice-scrubber">
+        <div class="slice-axis">Layer Z</div>
+        <button id="allLayersBtn" class="active" type="button">All</button>
+        <div id="scrubberValue" class="slice-value">All</div>
+        <div class="vertical-range-wrap">
+          <span id="sliceTopMark" class="slice-mark top">z5</span>
+          <input id="viewportLayerSlider" class="vertical-range" type="range" min="0" max="3" step="1" value="0" />
+          <span id="sliceBottomMark" class="slice-mark bottom">z0</span>
+        </div>
+      </div>
+      <div class="viewport-overlay">
+        <div class="overlay-card">
+          <p class="overlay-title">Last action</p>
+          <p id="lastAction" class="overlay-value">Chưa có bước nào.</p>
+        </div>
+        <div class="overlay-card">
+          <p class="overlay-title">Hint</p>
+          <p class="overlay-value">Chuột trái để xoay camera, cuộn để zoom, chuột phải để pan. `Solve` chạy nhanh đến khi có kết quả, `Play` chạy từng bước theo tốc độ slider.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+  <script>
+    class TPuzzleSolver3D {
+      static placementCache = new Map();
+      static orientationCache = null;
+      static clearPlacementCache(size = null, mode = null) {
+        if (size === null || mode === null) {
+          TPuzzleSolver3D.placementCache.clear();
+          return;
+        }
+        TPuzzleSolver3D.placementCache.delete(`${mode}:${size}`);
+      }
+
+      constructor(size = 4, mode = "SOLID_CUBE") {
+        this.size = size;
+        this.mode = mode;
+        this.baseShape = [
+          [0, 0, 0],
+          [1, 0, 0],
+          [2, 0, 0],
+          [1, 1, 0]
+        ];
+        this.history = [];
+        this.targetCells = [];
+        this.targetSet = new Set();
+        this.orientations = [];
+        this.placements = [];
+        this.cellToPlacements = new Map();
+        this.reset();
+      }
+
+      encode(cell) {
+        return cell.join(",");
+      }
+
+      decode(key) {
+        return key.split(",").map(Number);
+      }
+
+      generateTargetCells() {
+        const cells = [];
+        for (let x = 0; x < this.size; x += 1) {
+          for (let y = 0; y < this.size; y += 1) {
+            for (let z = 0; z < this.size; z += 1) {
+              const onSurface =
+                x === 0 || x === this.size - 1 ||
+                y === 0 || y === this.size - 1 ||
+                z === 0 || z === this.size - 1;
+              if (this.mode === "SOLID_CUBE" || onSurface) {
+                cells.push([x, y, z]);
+              }
+            }
+          }
+        }
+        return cells;
+      }
+
+      generateOrientations() {
+        if (TPuzzleSolver3D.orientationCache) {
+          return TPuzzleSolver3D.orientationCache;
+        }
+
+        const base2D = this.baseShape.map(([x, y]) => [x, y]);
+        const rotations = [
+          ([x, y]) => [x, y],
+          ([x, y]) => [y, -x],
+          ([x, y]) => [-x, -y],
+          ([x, y]) => [-y, x]
+        ];
+        const planes = [
+          { name: "XY", map: (u, v) => [u, v, 0] },
+          { name: "XZ", map: (u, v) => [u, 0, v] },
+          { name: "YZ", map: (u, v) => [0, u, v] }
+        ];
+        const seen = new Map();
+
+        for (const plane of planes) {
+          for (let angle = 0; angle < rotations.length; angle += 1) {
+            const rotated = base2D.map((cell) => rotations[angle](cell));
+            const mapped = rotated.map(([u, v]) => plane.map(u, v));
+            const mins = [0, 1, 2].map((axis) => Math.min(...mapped.map((cell) => cell[axis])));
+            const normalized = mapped.map(([x, y, z]) => [x - mins[0], y - mins[1], z - mins[2]]);
+            normalized.sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]) || (a[2] - b[2]));
+            const key = normalized.map((cell) => cell.join(",")).join("|");
+            if (!seen.has(key)) {
+              const bounds = {
+                x: Math.max(...normalized.map((cell) => cell[0])) + 1,
+                y: Math.max(...normalized.map((cell) => cell[1])) + 1,
+                z: Math.max(...normalized.map((cell) => cell[2])) + 1
+              };
+              seen.set(key, {
+                id: seen.size,
+                plane: plane.name,
+                angle: angle * 90,
+                cells: normalized,
+                bounds
+              });
+            }
+          }
+        }
+
+        TPuzzleSolver3D.orientationCache = Array.from(seen.values());
+        return TPuzzleSolver3D.orientationCache;
+      }
+
+      generatePlacements() {
+        const cacheKey = `${this.mode}:${this.size}`;
+        if (TPuzzleSolver3D.placementCache.has(cacheKey)) {
+          return TPuzzleSolver3D.placementCache.get(cacheKey);
+        }
+
+        const targetSet = new Set(this.targetCells.map((cell) => this.encode(cell)));
+        const placements = [];
+        let placementId = 0;
+
+        for (const orientation of this.orientations) {
+          const limitX = this.size - orientation.bounds.x;
+          const limitY = this.size - orientation.bounds.y;
+          const limitZ = this.size - orientation.bounds.z;
+          for (let ox = 0; ox <= limitX; ox += 1) {
+            for (let oy = 0; oy <= limitY; oy += 1) {
+              for (let oz = 0; oz <= limitZ; oz += 1) {
+                const cells = orientation.cells.map(([x, y, z]) => [x + ox, y + oy, z + oz]);
+                const cellKeys = cells.map((cell) => this.encode(cell));
+                if (cellKeys.every((key) => targetSet.has(key))) {
+                  placements.push({
+                    id: placementId,
+                    orientationId: orientation.id,
+                    plane: orientation.plane,
+                    angle: orientation.angle,
+                    cells,
+                    cellKeys
+                  });
+                  placementId += 1;
+                }
+              }
+            }
+          }
+        }
+
+        TPuzzleSolver3D.placementCache.set(cacheKey, placements);
+        return placements;
+      }
+
+      buildIndex() {
+        this.cellToPlacements = new Map();
+        for (const cell of this.targetCells) {
+          this.cellToPlacements.set(this.encode(cell), []);
+        }
+        for (const placement of this.placements) {
+          for (const key of placement.cellKeys) {
+            if (this.cellToPlacements.has(key)) {
+              this.cellToPlacements.get(key).push(placement.id);
+            }
+          }
+        }
+        for (const ids of this.cellToPlacements.values()) {
+          this.shuffleInPlace(ids);
+        }
+      }
+
+      shuffleInPlace(items) {
+        for (let i = items.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [items[i], items[j]] = [items[j], items[i]];
+        }
+      }
+
+      reset(skipRebuild = false) {
+        if (!skipRebuild) {
+          this.targetCells = this.generateTargetCells();
+          this.targetSet = new Set(this.targetCells.map((cell) => this.encode(cell)));
+          this.orientations = this.generateOrientations();
+          this.placements = this.generatePlacements();
+          this.buildIndex();
+        }
+
+        this.status = "ready";
+        this.occupied = new Set();
+        this.placedStack = [];
+        this.frames = [];
+        this.history = [];
+        this.stepCount = 0;
+        this.solution = null;
+        this.reason = "";
+        this.targetCount = this.targetCells.length;
+        this.expectedPieceCount = this.targetCount / 4;
+
+        if (this.targetCount % 4 !== 0) {
+          this.status = "no-solution";
+          this.reason = `Target có ${this.targetCount} voxel, không chia hết cho 4 nên không thể lát kín bằng T-tetromino.`;
+        }
+      }
+
+      getValidPlacementIdsForCell(cellKey) {
+        const ids = this.cellToPlacements.get(cellKey) || [];
+        const valid = [];
+        for (const id of ids) {
+          if (this.isPlacementValid(this.placements[id])) {
+            valid.push(id);
+          }
+        }
+        return valid;
+      }
+
+      isPlacementValid(placement) {
+        for (const key of placement.cellKeys) {
+          if (this.occupied.has(key)) {
+            return false;
+          }
+        }
+        return true;
+      }
+
+      chooseMostConstrainedCell() {
+        let bestCellKey = null;
+        let bestOptions = null;
+
+        for (const cell of this.targetCells) {
+          const key = this.encode(cell);
+          if (this.occupied.has(key)) {
+            continue;
+          }
+          const options = this.getValidPlacementIdsForCell(key);
+          if (options.length === 0) {
+            return { cellKey: key, options };
+          }
+          if (!bestOptions || options.length < bestOptions.length) {
+            bestCellKey = key;
+            bestOptions = options;
+            if (bestOptions.length === 1) {
+              break;
+            }
+          } else if (bestOptions && options.length === bestOptions.length && Math.random() < 0.5) {
+            bestCellKey = key;
+            bestOptions = options;
+          }
+        }
+
+        return { cellKey: bestCellKey, options: bestOptions || [] };
+      }
+
+      placePlacement(placement) {
+        for (const key of placement.cellKeys) {
+          this.occupied.add(key);
+        }
+        this.placedStack.push(placement);
+      }
+
+      removeLastPlacement() {
+        const placement = this.placedStack.pop();
+        if (!placement) {
+          return null;
+        }
+        for (const key of placement.cellKeys) {
+          this.occupied.delete(key);
+        }
+        if (this.frames.length > 0) {
+          this.frames[this.frames.length - 1].placedPid = null;
+        }
+        return placement;
+      }
+
+      stepSolve() {
+        if (this.status === "solved" || this.status === "no-solution") {
+          return { type: "terminal", status: this.status, reason: this.reason };
+        }
+
+        if (this.status === "ready") {
+          this.status = "solving";
+        }
+
+        if (this.occupied.size === this.targetCount) {
+          this.status = "solved";
+          this.solution = this.getSolution();
+          const event = {
+            type: "solved",
+            step: this.stepCount,
+            pieces: this.placedStack.length
+          };
+          this.history.push(event);
+          return event;
+        }
+
+        const needsNewFrame = () => (
+          this.frames.length === 0 ||
+          (this.frames[this.frames.length - 1].placedPid !== null &&
+          this.frames.length === this.placedStack.length)
+        );
+
+        while (true) {
+          if (this.occupied.size === this.targetCount) {
+            this.status = "solved";
+            this.solution = this.getSolution();
+            const solvedEvent = {
+              type: "solved",
+              step: this.stepCount,
+              pieces: this.placedStack.length
+            };
+            this.history.push(solvedEvent);
+            return solvedEvent;
+          }
+
+          if (needsNewFrame()) {
+            const choice = this.chooseMostConstrainedCell();
+            if (!choice.cellKey) {
+              this.status = "solved";
+              this.solution = this.getSolution();
+              const solvedEvent = {
+                type: "solved",
+                step: this.stepCount,
+                pieces: this.placedStack.length
+              };
+              this.history.push(solvedEvent);
+              return solvedEvent;
+            }
+            if (choice.options.length === 0) {
+              if (this.placedStack.length === 0) {
+                this.status = "no-solution";
+                this.reason = "Không còn placement hợp lệ cho ô khó nhất ở root.";
+                const failedEvent = {
+                  type: "no-solution",
+                  step: this.stepCount,
+                  cellKey: choice.cellKey,
+                  reason: this.reason
+                };
+                this.history.push(failedEvent);
+                return failedEvent;
+              }
+              const placement = this.removeLastPlacement();
+              this.stepCount += 1;
+              const backtrackEvent = {
+                type: "backtrack",
+                placement,
+                step: this.stepCount,
+                reason: `Dead-end tại ô ${choice.cellKey}`
+              };
+              this.history.push(backtrackEvent);
+              return backtrackEvent;
+            }
+            this.frames.push({
+              cellKey: choice.cellKey,
+              options: choice.options,
+              optionIndex: 0,
+              placedPid: null
+            });
+          }
+
+          const frame = this.frames[this.frames.length - 1];
+          while (frame.optionIndex < frame.options.length) {
+            const placementId = frame.options[frame.optionIndex];
+            frame.optionIndex += 1;
+            const placement = this.placements[placementId];
+            if (!this.isPlacementValid(placement)) {
+              continue;
+            }
+            this.placePlacement(placement);
+            frame.placedPid = placementId;
+            this.stepCount += 1;
+            const placeEvent = {
+              type: "place",
+              placement,
+              step: this.stepCount,
+              depth: this.placedStack.length,
+              cellKey: frame.cellKey
+            };
+            this.history.push(placeEvent);
+            return placeEvent;
+          }
+
+          this.frames.pop();
+          if (this.placedStack.length === 0) {
+            this.status = "no-solution";
+            this.reason = "Đã thử hết mọi placement hợp lệ.";
+            const exhaustedEvent = {
+              type: "no-solution",
+              step: this.stepCount,
+              reason: this.reason
+            };
+            this.history.push(exhaustedEvent);
+            return exhaustedEvent;
+          }
+
+          const removed = this.removeLastPlacement();
+          this.stepCount += 1;
+          const backtrackEvent = {
+            type: "backtrack",
+            placement: removed,
+            step: this.stepCount,
+            reason: `Hết lựa chọn cho ô ${frame.cellKey}`
+          };
+          this.history.push(backtrackEvent);
+          return backtrackEvent;
+        }
+      }
+
+      solve(limit = Number.POSITIVE_INFINITY) {
+        let count = 0;
+        let lastEvent = null;
+        while (count < limit && this.status !== "solved" && this.status !== "no-solution") {
+          lastEvent = this.stepSolve();
+          count += 1;
+        }
+        return lastEvent;
+      }
+
+      getSolution() {
+        return this.placedStack.map((placement) => placement.cells.map((cell) => [...cell]));
+      }
+    }
+
+    class SimpleOrbitControls {
+      constructor(camera, domElement) {
+        this.camera = camera;
+        this.domElement = domElement;
+        this.target = new THREE.Vector3(0, 0, 0);
+        this.spherical = new THREE.Spherical();
+        this.panSpeed = 0.008;
+        this.rotateSpeed = 0.008;
+        this.zoomSpeed = 0.12;
+        this.state = "idle";
+        this.pointer = { x: 0, y: 0 };
+        this.panOffset = new THREE.Vector3();
+
+        this.domElement.addEventListener("contextmenu", (event) => event.preventDefault());
+        this.domElement.addEventListener("mousedown", (event) => this.onPointerDown(event));
+        window.addEventListener("mousemove", (event) => this.onPointerMove(event));
+        window.addEventListener("mouseup", () => this.onPointerUp());
+        this.domElement.addEventListener("wheel", (event) => this.onWheel(event), { passive: false });
+
+        this.syncFromCamera();
+      }
+
+      syncFromCamera() {
+        const offset = this.camera.position.clone().sub(this.target);
+        this.spherical.setFromVector3(offset);
+      }
+
+      onPointerDown(event) {
+        this.state = event.button === 2 ? "pan" : "rotate";
+        this.pointer.x = event.clientX;
+        this.pointer.y = event.clientY;
+      }
+
+      onPointerMove(event) {
+        if (this.state === "idle") {
+          return;
+        }
+
+        const dx = event.clientX - this.pointer.x;
+        const dy = event.clientY - this.pointer.y;
+        this.pointer.x = event.clientX;
+        this.pointer.y = event.clientY;
+
+        if (this.state === "rotate") {
+          this.spherical.theta -= dx * this.rotateSpeed;
+          this.spherical.phi -= dy * this.rotateSpeed;
+          const epsilon = 0.001;
+          this.spherical.phi = Math.max(epsilon, Math.min(Math.PI - epsilon, this.spherical.phi));
+        } else if (this.state === "pan") {
+          const distance = this.camera.position.distanceTo(this.target);
+          const panX = -dx * this.panSpeed * distance;
+          const panY = dy * this.panSpeed * distance;
+          const forward = this.target.clone().sub(this.camera.position).normalize();
+          const right = new THREE.Vector3().crossVectors(forward, this.camera.up).normalize();
+          const up = new THREE.Vector3().copy(this.camera.up).normalize();
+          this.panOffset.copy(right.multiplyScalar(panX)).add(up.multiplyScalar(panY));
+          this.camera.position.add(this.panOffset);
+          this.target.add(this.panOffset);
+          this.syncFromCamera();
+        }
+      }
+
+      onPointerUp() {
+        this.state = "idle";
+      }
+
+      onWheel(event) {
+        event.preventDefault();
+        const factor = 1 + Math.sign(event.deltaY) * this.zoomSpeed;
+        this.spherical.radius *= factor;
+        this.spherical.radius = Math.max(3, Math.min(80, this.spherical.radius));
+      }
+
+      update() {
+        const offset = new THREE.Vector3().setFromSpherical(this.spherical);
+        this.camera.position.copy(this.target).add(offset);
+        this.camera.lookAt(this.target);
+      }
+    }
+
+    class PuzzleVisualizer {
+      constructor(container) {
+        this.container = container;
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0xe9dfcf);
+
+        this.camera = new THREE.PerspectiveCamera(52, 1, 0.1, 1000);
+        this.camera.position.set(10, 11, 16);
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        if ("outputColorSpace" in this.renderer && THREE.SRGBColorSpace) {
+          this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        } else if ("outputEncoding" in this.renderer && THREE.sRGBEncoding) {
+          this.renderer.outputEncoding = THREE.sRGBEncoding;
+        }
+        this.renderer.domElement.style.display = "block";
+        this.renderer.domElement.style.width = "100%";
+        this.renderer.domElement.style.height = "100%";
+        this.container.appendChild(this.renderer.domElement);
+
+        this.controls = new SimpleOrbitControls(this.camera, this.renderer.domElement);
+        this.controls.target.set(1.5, 1.5, 1.5);
+        this.controls.syncFromCamera();
+
+        this.scene.add(new THREE.AmbientLight(0xffffff, 1.25));
+        const point = new THREE.PointLight(0xffffff, 1.7, 100);
+        point.position.set(12, 15, 18);
+        this.scene.add(point);
+
+        const fill = new THREE.PointLight(0xffd5a4, 0.65, 80);
+        fill.position.set(-10, -6, 10);
+        this.scene.add(fill);
+
+        this.boardGroup = new THREE.Group();
+        this.targetGhostGroup = new THREE.Group();
+        this.pieceGroup = new THREE.Group();
+        this.scene.add(this.boardGroup);
+        this.scene.add(this.targetGhostGroup);
+        this.scene.add(this.pieceGroup);
+        this.scene.add(new THREE.AxesHelper(4.5));
+
+        const grid = new THREE.GridHelper(24, 24, 0xa08d72, 0xd9c8ae);
+        grid.position.y = -4.1;
+        this.scene.add(grid);
+
+        this.boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+        this.edgeGeometry = new THREE.EdgesGeometry(this.boxGeometry);
+
+        this.animations = [];
+        this.activePlacements = new Map();
+        this.layerFilter = "all";
+        this.clock = new THREE.Clock();
+        this.raycaster = new THREE.Raycaster();
+        this.pointerNdc = new THREE.Vector2(2, 2);
+        this.hoveredPlacementId = null;
+
+        this.renderer.domElement.addEventListener("mousemove", (event) => this.onPointerHover(event));
+        this.renderer.domElement.addEventListener("mouseleave", () => {
+          this.pointerNdc.set(2, 2);
+          this.setHoveredPlacement(null);
+        });
+
+        this.resizeObserver = new ResizeObserver(() => this.resize());
+        this.resizeObserver.observe(this.container);
+        this.resize();
+        this.animate();
+      }
+
+      resize() {
+        const width = this.container.clientWidth || 1;
+        const height = this.container.clientHeight || 1;
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(width, height, true);
+      }
+
+      clearGroup(group) {
+        while (group.children.length > 0) {
+          const child = group.children[0];
+          group.remove(child);
+          if (child.geometry) {
+            child.geometry.dispose?.();
+          }
+          if (child.material) {
+            if (Array.isArray(child.material)) {
+              child.material.forEach((material) => material.dispose?.());
+            } else {
+              child.material.dispose?.();
+            }
+          }
+        }
+      }
+
+      clearPieces() {
+        this.clearGroup(this.pieceGroup);
+        this.activePlacements.clear();
+        this.animations = [];
+        this.hoveredPlacementId = null;
+      }
+
+      resetScene() {
+        this.clearGroup(this.boardGroup);
+        this.clearGroup(this.targetGhostGroup);
+        this.clearPieces();
+      }
+
+      centerForSize(size) {
+        return (size - 1) / 2;
+      }
+
+      cellPosition(cell, size) {
+        const center = this.centerForSize(size);
+        return new THREE.Vector3(
+          cell[0] - center,
+          cell[2] - center,
+          cell[1] - center
+        );
+      }
+
+      buildBoard(size, targetCells) {
+        this.clearGroup(this.boardGroup);
+        this.clearGroup(this.targetGhostGroup);
+        this.clearPieces();
+
+        const center = this.centerForSize(size);
+        const bbox = new THREE.BoxGeometry(size, size, size);
+        const wire = new THREE.LineSegments(
+          new THREE.EdgesGeometry(bbox),
+          new THREE.LineBasicMaterial({ color: 0x7f6d56, transparent: true, opacity: 0.55 })
+        );
+        wire.position.set(0, 0, 0);
+        this.boardGroup.add(wire);
+
+        const planeMaterial = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.18,
+          side: THREE.DoubleSide
+        });
+        const basePlane = new THREE.Mesh(new THREE.PlaneGeometry(size + 2, size + 2), planeMaterial);
+        basePlane.rotation.x = -Math.PI / 2;
+        basePlane.position.set(0, -center - 0.55, 0);
+        this.boardGroup.add(basePlane);
+
+        const ghostMaterial = new THREE.MeshPhongMaterial({
+          color: 0x8c7b67,
+          transparent: true,
+          opacity: targetCells.length > 128 ? 0.06 : 0.1
+        });
+        const ghostEdges = new THREE.LineBasicMaterial({
+          color: 0x6a5947,
+          transparent: true,
+          opacity: 0.12
+        });
+
+        for (const cell of targetCells) {
+          const group = new THREE.Group();
+          const cube = new THREE.Mesh(this.boxGeometry, ghostMaterial);
+          const edges = new THREE.LineSegments(this.edgeGeometry, ghostEdges);
+          group.add(cube);
+          group.add(edges);
+          group.userData = {
+            z: cell[2],
+            kind: "target-voxel"
+          };
+          const pos = this.cellPosition(cell, size);
+          group.position.copy(pos);
+          this.targetGhostGroup.add(group);
+        }
+
+        this.controls.target.set(0, 0, 0);
+        this.camera.position.set(size * 2.3, size * 2.15, size * 2.75);
+        this.controls.update();
+      }
+
+      getPlacementColor(placementId) {
+        const hue = (placementId * 137.508) % 360;
+        return new THREE.Color().setHSL(hue / 360, 0.78, 0.48);
+      }
+
+      createPieceGroup(placement, size, color) {
+        const material = new THREE.MeshPhongMaterial({
+          color,
+          transparent: false,
+          opacity: 1,
+          shininess: 95
+        });
+        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x23180f, transparent: true, opacity: 0.42 });
+        const group = new THREE.Group();
+
+        for (const cell of placement.cells) {
+          const voxel = new THREE.Group();
+          const cube = new THREE.Mesh(this.boxGeometry, material);
+          const edges = new THREE.LineSegments(this.edgeGeometry, edgeMaterial);
+          voxel.add(cube);
+          voxel.add(edges);
+          voxel.userData = {
+            z: cell[2],
+            kind: "piece-voxel",
+            placementId: placement.id
+          };
+          voxel.position.copy(this.cellPosition(cell, size));
+          group.add(voxel);
+        }
+
+        group.scale.setScalar(0.001);
+        group.userData = {
+          zValues: placement.cells.map((cell) => cell[2]),
+          placementId: placement.id
+        };
+        return group;
+      }
+
+      setLayerFilter(layer) {
+        this.layerFilter = layer;
+        for (const voxel of this.targetGhostGroup.children) {
+          voxel.visible = this.matchesLayer(voxel.userData.z);
+        }
+        for (const entry of this.activePlacements.values()) {
+          const showWholePiece = this.layerFilter === "all"
+            || entry.group.userData.zValues.includes(Number(this.layerFilter));
+          entry.group.visible = showWholePiece;
+          entry.group.children.forEach((voxel) => {
+            voxel.visible = true;
+          });
+        }
+      }
+
+      matchesLayer(zValue) {
+        if (this.layerFilter === "all") {
+          return true;
+        }
+        return zValue === Number(this.layerFilter);
+      }
+
+      addPlacement(placement, size, pieceIndex, animate = true) {
+        const color = this.getPlacementColor(placement.id);
+        const group = this.createPieceGroup(placement, size, color);
+        this.pieceGroup.add(group);
+        this.activePlacements.set(placement.id, { group, color });
+        this.setLayerFilter(this.layerFilter);
+        if (animate) {
+          this.animations.push({
+            type: "grow",
+            group,
+            progress: 0,
+            duration: 0.22
+          });
+        } else {
+          group.scale.setScalar(1);
+        }
+      }
+
+      removePlacement(placement) {
+        const entry = this.activePlacements.get(placement.id);
+        if (!entry) {
+          return;
+        }
+        if (this.hoveredPlacementId === placement.id) {
+          this.setHoveredPlacement(null);
+        }
+        this.animations.push({
+          type: "fade",
+          group: entry.group,
+          progress: 0,
+          duration: 0.18,
+          placementId: placement.id
+        });
+      }
+
+      onPointerHover(event) {
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        this.pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      }
+
+      setHoveredPlacement(placementId) {
+        if (this.hoveredPlacementId === placementId) {
+          return;
+        }
+
+        if (this.hoveredPlacementId !== null) {
+          const prev = this.activePlacements.get(this.hoveredPlacementId);
+          if (prev) {
+            prev.group.traverse((obj) => {
+              if (obj.type === "LineSegments" && obj.material) {
+                obj.material.color.set(0x23180f);
+                obj.material.opacity = 0.34;
+              }
+              if (obj.type === "Mesh" && obj.material) {
+                obj.material.emissive?.setHex(0x000000);
+                obj.material.emissiveIntensity = 0;
+              }
+            });
+          }
+        }
+
+        this.hoveredPlacementId = placementId;
+        const hoverBadge = document.getElementById("hoverBadge");
+        if (hoverBadge) {
+          if (placementId === null) {
+            hoverBadge.classList.remove("visible");
+          } else {
+            hoverBadge.textContent = `Piece #${placementId}`;
+            hoverBadge.classList.add("visible");
+          }
+        }
+
+        if (placementId !== null) {
+          const next = this.activePlacements.get(placementId);
+          if (next) {
+            next.group.traverse((obj) => {
+              if (obj.type === "LineSegments" && obj.material) {
+                obj.material.color.set(0xffffff);
+                obj.material.opacity = 0.95;
+              }
+              if (obj.type === "Mesh" && obj.material) {
+                obj.material.emissive?.setHex(0xfff1c7);
+                obj.material.emissiveIntensity = 0.28;
+              }
+            });
+          }
+        }
+      }
+
+      updateHoverState() {
+        this.raycaster.setFromCamera(this.pointerNdc, this.camera);
+        const intersections = this.raycaster.intersectObjects(this.pieceGroup.children, true);
+        const hit = intersections.find((item) => (
+          item.object.type === "Mesh" &&
+          item.object.parent?.userData?.placementId !== undefined
+        ));
+        const placementId = hit ? hit.object.parent.userData.placementId : null;
+        this.setHoveredPlacement(placementId);
+      }
+
+      animate() {
+        requestAnimationFrame(() => this.animate());
+        const dt = Math.min(this.clock.getDelta(), 0.05);
+        this.controls.update();
+        this.updateHoverState();
+
+        this.animations = this.animations.filter((anim) => {
+          anim.progress += dt / anim.duration;
+          const t = Math.min(anim.progress, 1);
+          if (anim.type === "grow") {
+            const eased = 1 - Math.pow(1 - t, 3);
+            anim.group.scale.setScalar(Math.max(0.001, eased));
+          } else if (anim.type === "fade") {
+            const eased = 1 - t;
+            anim.group.scale.setScalar(Math.max(0.001, eased));
+            anim.group.traverse((obj) => {
+              if (obj.material && "opacity" in obj.material) {
+                obj.material.opacity = Math.max(0, eased * (obj.type === "LineSegments" ? 0.38 : 1));
+              }
+            });
+          }
+
+          if (t >= 1) {
+            if (anim.type === "grow") {
+              anim.group.scale.setScalar(1);
+            }
+            if (anim.type === "fade") {
+              this.pieceGroup.remove(anim.group);
+              this.activePlacements.delete(anim.placementId);
+            }
+            return false;
+          }
+          return true;
+        });
+
+        this.renderer.render(this.scene, this.camera);
+      }
+    }
+
+    const state = {
+      solver: null,
+      visualizer: null,
+      autoPlay: false,
+      solveFast: false,
+      fastRafId: 0,
+      playInterval: 0,
+      configKey: null,
+      layerMode: "all"
+    };
+
+    const ui = {
+      sizeInput: document.getElementById("sizeInput"),
+      modeSelect: document.getElementById("modeSelect"),
+      allLayersBtn: document.getElementById("allLayersBtn"),
+      viewportLayerSlider: document.getElementById("viewportLayerSlider"),
+      scrubberValue: document.getElementById("scrubberValue"),
+      sliceTopMark: document.getElementById("sliceTopMark"),
+      sliceBottomMark: document.getElementById("sliceBottomMark"),
+      sliceScrubber: document.querySelector(".slice-scrubber"),
+      solveBtn: document.getElementById("solveBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      solutionPreview: document.getElementById("solutionPreview"),
+      placedCount: document.getElementById("placedCount"),
+      stepCount: document.getElementById("stepCount"),
+      targetCount: document.getElementById("targetCount"),
+      statusLine: document.getElementById("statusLine"),
+      statusText: document.getElementById("statusText"),
+      summaryText: document.getElementById("summaryText"),
+      lastAction: document.getElementById("lastAction"),
+      orientationToggle: document.getElementById("orientationToggle"),
+      orientationPanel: document.getElementById("orientationPanel"),
+      viewport: document.getElementById("viewport")
+    };
+
+    function formatPlacement(placement) {
+      return placement.cells.map((cell) => `[${cell.join(",")}]`).join(" ");
+    }
+
+    function getCurrentLayerFilter() {
+      return state.layerMode === "all" ? "all" : String(ui.viewportLayerSlider.value);
+    }
+
+    function renderStateToScene(animateLastPlacement = false) {
+      if (!state.solver || !state.visualizer) {
+        return;
+      }
+      state.visualizer.buildBoard(state.solver.size, state.solver.targetCells);
+      state.visualizer.setLayerFilter(getCurrentLayerFilter());
+      state.solver.placedStack.forEach((placement, index) => {
+        const animate = animateLastPlacement && index === state.solver.placedStack.length - 1;
+        state.visualizer.addPlacement(placement, state.solver.size, index, animate);
+      });
+    }
+
+    function refreshSolutionPreview() {
+      if (!state.solver) {
+        ui.solutionPreview.textContent = "Chưa có solver.";
+        return;
+      }
+
+      const header = [
+        `status: ${state.solver.status}`,
+        `placed: ${state.solver.placedStack.length}`,
+        `steps: ${state.solver.stepCount}`
+      ];
+
+      if (state.solver.placedStack.length === 0) {
+        ui.solutionPreview.textContent = header.join("\n") + "\n\nChưa có placement nào.";
+        return;
+      }
+
+      const lines = state.solver.placedStack.map((placement, index) => {
+        return `${String(index + 1).padStart(2, "0")}: ${formatPlacement(placement)}`;
+      });
+
+      ui.solutionPreview.textContent = header.join("\n") + "\n\n" + lines.join("\n");
+    }
+
+    function updateStatus(status, text) {
+      ui.statusLine.className = "status-line status-" + status;
+      ui.statusText.textContent = text;
+    }
+
+    function refreshLayerOptions(size) {
+      ui.viewportLayerSlider.min = "0";
+      ui.viewportLayerSlider.max = String(Math.max(0, size - 1));
+      ui.viewportLayerSlider.value = "0";
+      ui.sliceTopMark.textContent = `z${Math.max(0, size - 1)}`;
+      ui.sliceBottomMark.textContent = "z0";
+      state.layerMode = "all";
+      refreshLayerLabel();
+    }
+
+    function refreshLayerLabel() {
+      if (state.layerMode === "all") {
+        ui.allLayersBtn.classList.add("active");
+        ui.scrubberValue.textContent = "All";
+      } else {
+        ui.allLayersBtn.classList.remove("active");
+        ui.scrubberValue.textContent = `z ${ui.viewportLayerSlider.value} / ${ui.viewportLayerSlider.max}`;
+      }
+    }
+
+    function setLayerMode(mode, value = null) {
+      state.layerMode = mode;
+      if (value !== null) {
+        ui.viewportLayerSlider.value = String(value);
+      }
+      refreshLayerLabel();
+      if (state.visualizer && state.solver) {
+        renderStateToScene(false);
+      }
+    }
+
+    function handleScrubberWheel(event) {
+      event.preventDefault();
+      const current = Number(ui.viewportLayerSlider.value);
+      const min = Number(ui.viewportLayerSlider.min);
+      const max = Number(ui.viewportLayerSlider.max);
+      const direction = event.deltaY > 0 ? -1 : 1;
+      const next = Math.max(min, Math.min(max, current + direction));
+      setLayerMode("single", next);
+    }
+
+    function drawOrientationCard(canvas, orientation) {
+      const ctx = canvas.getContext("2d");
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const width = canvas.clientWidth * dpr;
+      const height = canvas.clientHeight * dpr;
+      canvas.width = width;
+      canvas.height = height;
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+      const points = orientation.cells.map(([x, y, z]) => {
+        const isoX = (x - z) * 22;
+        const isoY = (x + z) * 12 - y * 26;
+        return { isoX, isoY };
+      });
+      const minX = Math.min(...points.map((p) => p.isoX));
+      const maxX = Math.max(...points.map((p) => p.isoX));
+      const minY = Math.min(...points.map((p) => p.isoY));
+      const maxY = Math.max(...points.map((p) => p.isoY));
+      const cx = canvas.clientWidth / 2 - (minX + maxX) / 2;
+      const cy = canvas.clientHeight / 2 - (minY + maxY) / 2 + 6;
+
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+
+      orientation.cells.forEach(([x, y, z], index) => {
+        const px = points[index].isoX + cx;
+        const py = points[index].isoY + cy;
+        const top = [
+          [px, py - 14],
+          [px + 14, py - 6],
+          [px, py + 2],
+          [px - 14, py - 6]
+        ];
+        const left = [
+          [px - 14, py - 6],
+          [px, py + 2],
+          [px, py + 18],
+          [px - 14, py + 10]
+        ];
+        const right = [
+          [px, py + 2],
+          [px + 14, py - 6],
+          [px + 14, py + 10],
+          [px, py + 18]
+        ];
+
+        ctx.fillStyle = index % 2 === 0 ? "rgba(182,77,26,0.82)" : "rgba(11,110,79,0.74)";
+        ctx.beginPath();
+        top.forEach(([x0, y0], i) => i === 0 ? ctx.moveTo(x0, y0) : ctx.lineTo(x0, y0));
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(108,74,46,0.46)";
+        ctx.beginPath();
+        right.forEach(([x0, y0], i) => i === 0 ? ctx.moveTo(x0, y0) : ctx.lineTo(x0, y0));
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(65,110,95,0.38)";
+        ctx.beginPath();
+        left.forEach(([x0, y0], i) => i === 0 ? ctx.moveTo(x0, y0) : ctx.lineTo(x0, y0));
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      });
+    }
+
+    function renderOrientations(orientations) {
+      ui.orientationPanel.innerHTML = "";
+      orientations.forEach((orientation) => {
+        const card = document.createElement("div");
+        card.className = "orientation-card";
+        const title = document.createElement("strong");
+        title.textContent = `${orientation.plane} • ${orientation.angle}°`;
+        const meta = document.createElement("small");
+        meta.textContent = `bounds ${orientation.bounds.x} x ${orientation.bounds.y} x ${orientation.bounds.z}`;
+        const canvas = document.createElement("canvas");
+        canvas.className = "orientation-canvas";
+        card.appendChild(title);
+        card.appendChild(meta);
+        card.appendChild(canvas);
+        ui.orientationPanel.appendChild(card);
+        requestAnimationFrame(() => drawOrientationCard(canvas, orientation));
+      });
+    }
+
+    function applyEvent(event) {
+      if (!event || !state.solver || !state.visualizer) {
+        return;
+      }
+
+      if (event.type === "place") {
+        state.visualizer.addPlacement(event.placement, state.solver.size, state.solver.placedStack.length - 1, true);
+        ui.lastAction.textContent = `Place depth ${event.depth}: ${formatPlacement(event.placement)}`;
+      } else if (event.type === "backtrack") {
+        state.visualizer.removePlacement(event.placement);
+        ui.lastAction.textContent = `Backtrack: gỡ mảnh ${formatPlacement(event.placement)}. ${event.reason}`;
+      } else if (event.type === "solved") {
+        ui.lastAction.textContent = `Solved với ${event.pieces} mảnh sau ${event.step} bước.`;
+      } else if (event.type === "no-solution") {
+        ui.lastAction.textContent = event.reason || "Không tìm thấy lời giải.";
+      }
+
+      refreshStats();
+    }
+
+    function refreshStats() {
+      if (!state.solver) {
+        return;
+      }
+
+      ui.placedCount.textContent = String(state.solver.placedStack.length);
+      ui.stepCount.textContent = String(state.solver.stepCount);
+      ui.targetCount.textContent = String(state.solver.targetCount);
+      refreshSolutionPreview();
+
+      if (state.solver.status === "ready") {
+        updateStatus("ready", "ready");
+      } else if (state.solver.status === "solving") {
+        updateStatus("solving", "solving");
+      } else if (state.solver.status === "solved") {
+        updateStatus("solved", "solved");
+      } else if (state.solver.status === "no-solution") {
+        updateStatus("no-solution", "no solution");
+      }
+
+      const placementCount = state.solver.placements.length;
+      const orientationCount = state.solver.orientations.length;
+      const pieceInfo = Number.isInteger(state.solver.expectedPieceCount)
+        ? `${state.solver.expectedPieceCount} mảnh`
+        : `${state.solver.targetCount}/4 mảnh`;
+      ui.summaryText.textContent = `${orientationCount} orientation, ${placementCount} placement hợp lệ, target ${pieceInfo}. ${state.solver.reason || ""}`.trim();
+      ui.solveBtn.disabled = false;
+      ui.resetBtn.disabled = false;
+    }
+
+    function stopAllPlayback() {
+      state.autoPlay = false;
+      state.solveFast = false;
+      if (state.playInterval) {
+        clearInterval(state.playInterval);
+        state.playInterval = 0;
+      }
+      if (state.fastRafId) {
+        cancelAnimationFrame(state.fastRafId);
+        state.fastRafId = 0;
+      }
+      refreshStats();
+    }
+
+    function generatePuzzle() {
+      stopAllPlayback();
+      const size = Math.max(2, Math.min(7, Number(ui.sizeInput.value) || 4));
+      const mode = ui.modeSelect.value;
+      const nextConfigKey = `${mode}:${size}`;
+      if (state.configKey !== nextConfigKey) {
+        TPuzzleSolver3D.clearPlacementCache(size, mode);
+        if (state.visualizer) {
+          state.visualizer.resetScene();
+        }
+      }
+      state.solver = new TPuzzleSolver3D(size, mode);
+      state.configKey = nextConfigKey;
+      if (!state.visualizer) {
+        ui.lastAction.textContent = "Three.js viewer chưa khởi tạo được. Mở F12 để xem lỗi CDN.";
+        refreshLayerOptions(size);
+        renderOrientations(state.solver.orientations);
+        refreshStats();
+        return;
+      }
+      refreshLayerOptions(size);
+      renderStateToScene(false);
+      renderOrientations(state.solver.orientations);
+      ui.lastAction.textContent = "Target và placement đã được sinh xong.";
+      refreshStats();
+    }
+
+    function solveFastLoop() {
+      if (!state.solveFast || !state.solver) {
+        return;
+      }
+      const batchSize = 320;
+      let lastEvent = null;
+      for (let i = 0; i < batchSize; i += 1) {
+        lastEvent = state.solver.stepSolve();
+        if (lastEvent && (lastEvent.type === "place" || lastEvent.type === "backtrack")) {
+          applyEvent(lastEvent);
+        }
+        if (state.solver.status === "solved" || state.solver.status === "no-solution") {
+          applyEvent(lastEvent);
+          stopAllPlayback();
+          return;
+        }
+      }
+      if (lastEvent) {
+        refreshStats();
+      }
+      state.fastRafId = requestAnimationFrame(solveFastLoop);
+    }
+
+    function solveFast() {
+      if (!state.solver) {
+        generatePuzzle();
+      }
+      if (state.solver.status === "solved" || state.solver.status === "no-solution") {
+        state.solver.reset();
+        if (state.visualizer) {
+          renderStateToScene(false);
+        }
+      }
+      stopAllPlayback();
+      state.solveFast = true;
+      state.fastRafId = requestAnimationFrame(solveFastLoop);
+    }
+
+    function resetCurrent() {
+      if (!state.solver) {
+        generatePuzzle();
+        return;
+      }
+      stopAllPlayback();
+      state.solver.reset();
+      if (state.visualizer) {
+        renderStateToScene(false);
+      }
+      ui.lastAction.textContent = "Solver và scene đã reset.";
+      refreshStats();
+    }
+
+    ui.sizeInput.addEventListener("change", generatePuzzle);
+    ui.modeSelect.addEventListener("change", generatePuzzle);
+    ui.solveBtn.addEventListener("click", solveFast);
+    ui.resetBtn.addEventListener("click", resetCurrent);
+    ui.viewportLayerSlider.addEventListener("input", () => {
+      setLayerMode("single", Number(ui.viewportLayerSlider.value));
+    });
+    ui.sliceScrubber.addEventListener("wheel", handleScrubberWheel, { passive: false });
+    ui.allLayersBtn.addEventListener("click", () => {
+      setLayerMode(state.layerMode === "all" ? "single" : "all", Number(ui.viewportLayerSlider.value));
+    });
+    ui.orientationToggle.addEventListener("change", () => {
+      ui.orientationPanel.classList.toggle("hidden", !ui.orientationToggle.checked);
+      if (ui.orientationToggle.checked && state.solver) {
+        renderOrientations(state.solver.orientations);
+      }
+    });
+
+    try {
+      state.visualizer = new PuzzleVisualizer(ui.viewport);
+    } catch (error) {
+      console.error(error);
+      state.visualizer = null;
+      updateStatus("no-solution", "viewer error");
+      ui.lastAction.textContent = `Không khởi tạo được viewer 3D: ${error.message}`;
+    }
+    refreshLayerLabel();
+    generatePuzzle();
+  </script>
+</body>
+</html>
