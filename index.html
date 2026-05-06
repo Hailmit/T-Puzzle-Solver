@@ -473,6 +473,23 @@
       color: white;
     }
 
+    .slice-mode-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px;
+      border-radius: 14px;
+      background: rgba(34, 28, 21, 0.06);
+    }
+
+    .slice-mode-group button {
+      width: auto;
+      min-height: 36px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+    }
+
     .slice-axis {
       font-size: 11px;
       font-weight: 700;
@@ -685,8 +702,8 @@
             <label>
               Size N
               <select id="sizeInput">
-                <option value="4" selected>4</option>
-                <option value="6">6</option>
+                <option value="4">4</option>
+                <option value="6" selected>6</option>
               </select>
             </label>
             <label>
@@ -761,6 +778,10 @@
       <div class="slice-scrubber">
         <div class="slice-axis">Layer Z</div>
         <button id="allLayersBtn" class="active" type="button">All</button>
+        <div class="slice-mode-group">
+          <button id="focusModeBtn" class="active" type="button">Focus</button>
+          <button id="sliceOnlyBtn" type="button">Slice Only</button>
+        </div>
         <div id="scrubberValue" class="slice-value">All</div>
         <div class="vertical-range-wrap">
           <span id="sliceTopMark" class="slice-mark top">z5</span>
@@ -1481,6 +1502,7 @@
         this.clearGroup(this.boardGroup);
         this.clearGroup(this.targetGhostGroup);
         this.clearPieces();
+        this.currentSize = size;
 
         const center = this.centerForSize(size);
         const bbox = new THREE.BoxGeometry(size, size, size);
@@ -1501,6 +1523,21 @@
         basePlane.rotation.x = -Math.PI / 2;
         basePlane.position.set(0, -center - 0.55, 0);
         this.boardGroup.add(basePlane);
+
+        const slicePlane = new THREE.Mesh(
+          new THREE.PlaneGeometry(size + 0.15, size + 0.15),
+          new THREE.MeshBasicMaterial({
+            color: 0xf4b860,
+            transparent: true,
+            opacity: 0.14,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          })
+        );
+        slicePlane.rotation.x = -Math.PI / 2;
+        slicePlane.visible = false;
+        this.slicePlane = slicePlane;
+        this.boardGroup.add(slicePlane);
 
         const ghostMaterial = new THREE.MeshPhongMaterial({
           color: 0x8c7b67,
@@ -1534,8 +1571,21 @@
       }
 
       getPlacementColor(placementId) {
-        const hue = (placementId * 137.508) % 360;
-        return new THREE.Color().setHSL(hue / 360, 0.78, 0.48);
+        const palette = [
+          0xd1495b,
+          0x0077b6,
+          0x2b9348,
+          0xf77f00,
+          0x6a4c93,
+          0x118ab2,
+          0xe76f51,
+          0x8ac926,
+          0xc1121f,
+          0x3a86ff,
+          0xffbe0b,
+          0x8338ec
+        ];
+        return new THREE.Color(palette[placementId % palette.length]);
       }
 
       createPieceGroup(placement, size, color) {
@@ -1545,7 +1595,7 @@
           opacity: 1,
           shininess: 95
         });
-        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x23180f, transparent: true, opacity: 0.42 });
+        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x1a120b, transparent: true, opacity: 0.5 });
         const group = new THREE.Group();
 
         for (const cell of placement.cells) {
@@ -1573,15 +1623,37 @@
 
       setLayerFilter(layer) {
         this.layerFilter = layer;
+        if (this.slicePlane) {
+          if (this.layerFilter === "all") {
+            this.slicePlane.visible = false;
+          } else {
+            const center = this.centerForSize(this.currentSize);
+            const y = Number(this.layerFilter) - center;
+            this.slicePlane.position.set(0, y, 0);
+            this.slicePlane.visible = true;
+          }
+        }
         for (const voxel of this.targetGhostGroup.children) {
           voxel.visible = this.matchesLayer(voxel.userData.z);
         }
         for (const entry of this.activePlacements.values()) {
           const showWholePiece = this.layerFilter === "all"
             || entry.group.userData.zValues.includes(Number(this.layerFilter));
-          entry.group.visible = showWholePiece;
+          entry.group.visible = this.layerFilter === "all" || showWholePiece;
           entry.group.children.forEach((voxel) => {
-            voxel.visible = true;
+            const isActiveLayer = this.layerFilter === "all" || voxel.userData.z === Number(this.layerFilter);
+            voxel.visible = state.sliceViewMode === "focus" ? true : isActiveLayer;
+            voxel.traverse((obj) => {
+              if (obj.type === "Mesh" && obj.material) {
+                const dimmed = !isActiveLayer && state.sliceViewMode === "focus";
+                obj.material.transparent = dimmed;
+                obj.material.opacity = isActiveLayer ? 1 : (state.sliceViewMode === "focus" ? 0.18 : 0);
+                obj.material.depthWrite = isActiveLayer;
+              }
+              if (obj.type === "LineSegments" && obj.material) {
+                obj.material.opacity = isActiveLayer ? 0.5 : (state.sliceViewMode === "focus" ? 0.12 : 0);
+              }
+            });
           });
         }
       }
@@ -1593,8 +1665,8 @@
         return zValue === Number(this.layerFilter);
       }
 
-      addPlacement(placement, size, pieceIndex, animate = true) {
-        const color = this.getPlacementColor(placement.id);
+      addPlacement(placement, size, pieceIndex, animate = true, colorOverride = null) {
+        const color = colorOverride !== null ? new THREE.Color(colorOverride) : this.getPlacementColor(placement.id);
         const group = this.createPieceGroup(placement, size, color);
         this.pieceGroup.add(group);
         this.activePlacements.set(placement.id, { group, color });
@@ -1742,13 +1814,16 @@
       fastLastUiSyncMs: 0,
       playInterval: 0,
       configKey: null,
-      layerMode: "all"
+      layerMode: "all",
+      sliceViewMode: "focus"
     };
 
     const ui = {
       sizeInput: document.getElementById("sizeInput"),
       modeSelect: document.getElementById("modeSelect"),
       allLayersBtn: document.getElementById("allLayersBtn"),
+      focusModeBtn: document.getElementById("focusModeBtn"),
+      sliceOnlyBtn: document.getElementById("sliceOnlyBtn"),
       viewportLayerSlider: document.getElementById("viewportLayerSlider"),
       scrubberValue: document.getElementById("scrubberValue"),
       sliceTopMark: document.getElementById("sliceTopMark"),
@@ -1773,6 +1848,63 @@
       return placement.cells.map((cell) => `[${cell.join(",")}]`).join(" ");
     }
 
+    function computePlacementColorMap(placements) {
+      const palette = [
+        0xd62828,
+        0x1d4ed8,
+        0x15803d,
+        0xf77f00,
+        0x7c3aed,
+        0x0891b2,
+        0xc2410c,
+        0xbe123c,
+        0x65a30d,
+        0x0f766e
+      ];
+      const occupied = new Map();
+      const adjacency = new Map();
+      const deltas = [
+        [1, 0, 0], [-1, 0, 0],
+        [0, 1, 0], [0, -1, 0],
+        [0, 0, 1], [0, 0, -1]
+      ];
+
+      placements.forEach((placement, index) => {
+        adjacency.set(index, new Set());
+        placement.cells.forEach((cell) => {
+          occupied.set(cell.join(","), index);
+        });
+      });
+
+      placements.forEach((placement, index) => {
+        placement.cells.forEach(([x, y, z]) => {
+          deltas.forEach(([dx, dy, dz]) => {
+            const neighborIndex = occupied.get(`${x + dx},${y + dy},${z + dz}`);
+            if (neighborIndex !== undefined && neighborIndex !== index) {
+              adjacency.get(index).add(neighborIndex);
+            }
+          });
+        });
+      });
+
+      const order = [...adjacency.keys()].sort((a, b) => adjacency.get(b).size - adjacency.get(a).size);
+      const colorByIndex = new Map();
+
+      order.forEach((index) => {
+        const used = new Set([...adjacency.get(index)].map((neighbor) => colorByIndex.get(neighbor)).filter((value) => value !== undefined));
+        let chosen = palette[0];
+        for (const candidate of palette) {
+          if (!used.has(candidate)) {
+            chosen = candidate;
+            break;
+          }
+        }
+        colorByIndex.set(index, chosen);
+      });
+
+      return colorByIndex;
+    }
+
     function getCurrentLayerFilter() {
       return state.layerMode === "all" ? "all" : String(ui.viewportLayerSlider.value);
     }
@@ -1783,9 +1915,10 @@
       }
       state.visualizer.buildBoard(state.solver.size, state.solver.targetCells);
       state.visualizer.setLayerFilter(getCurrentLayerFilter());
+      const colorMap = computePlacementColorMap(state.solver.placedStack);
       state.solver.placedStack.forEach((placement, index) => {
         const animate = animateLastPlacement && index === state.solver.placedStack.length - 1;
-        state.visualizer.addPlacement(placement, state.solver.size, index, animate);
+        state.visualizer.addPlacement(placement, state.solver.size, index, animate, colorMap.get(index));
       });
     }
 
@@ -1836,6 +1969,8 @@
         ui.allLayersBtn.classList.remove("active");
         ui.scrubberValue.textContent = `z ${ui.viewportLayerSlider.value} / ${ui.viewportLayerSlider.max}`;
       }
+      ui.focusModeBtn.classList.toggle("active", state.sliceViewMode === "focus");
+      ui.sliceOnlyBtn.classList.toggle("active", state.sliceViewMode === "slice-only");
     }
 
     function setLayerMode(mode, value = null) {
@@ -1843,6 +1978,14 @@
       if (value !== null) {
         ui.viewportLayerSlider.value = String(value);
       }
+      refreshLayerLabel();
+      if (state.visualizer && state.solver) {
+        renderStateToScene(false);
+      }
+    }
+
+    function setSliceViewMode(mode) {
+      state.sliceViewMode = mode;
       refreshLayerLabel();
       if (state.visualizer && state.solver) {
         renderStateToScene(false);
@@ -2104,6 +2247,15 @@
     ui.sliceScrubber.addEventListener("wheel", handleScrubberWheel, { passive: false });
     ui.allLayersBtn.addEventListener("click", () => {
       setLayerMode(state.layerMode === "all" ? "single" : "all", Number(ui.viewportLayerSlider.value));
+    });
+    ui.focusModeBtn.addEventListener("click", () => {
+      setSliceViewMode("focus");
+    });
+    ui.sliceOnlyBtn.addEventListener("click", () => {
+      setSliceViewMode("slice-only");
+      if (state.layerMode === "all") {
+        setLayerMode("single", Number(ui.viewportLayerSlider.value));
+      }
     });
     ui.orientationToggle.addEventListener("change", () => {
       ui.orientationPanel.classList.toggle("hidden", !ui.orientationToggle.checked);
